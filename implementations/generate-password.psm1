@@ -9,6 +9,10 @@
     Specifies the minimum length of characters for each set of characters
 .PARAMETER Frequencies
     The probability to have characters in this set, depending on other sets
+.PARAMETER Exclusions
+    Words to exclude from the generation, can use wildcards.
+.PARAMETER CaseSensitiveExclusions
+    Whether or not words in the list should be case-sensitive
 .OUTPUTS
     PasswordCharset. The charset for generatinng password.
 .EXAMPLE
@@ -44,10 +48,16 @@ function New-PasswordCharset {
             5,
             5,
             2
-        )
+        ),
+
+        [Parameter()]
+        [string[]]$Exclusions = @(),
+
+        [Parameter()]
+        [bool]$CaseSensitiveExclusions = $true
     )
 
-    return [PasswordCharset]::new($Sets, $MinLengths, $Frequencies)
+    return [PasswordCharset]::new($Sets, $MinLengths, $Frequencies, $Exclusions, $CaseSensitiveExclusions)
 }
 
 <#
@@ -61,10 +71,10 @@ function New-PasswordCharset {
     The minimum length of the password to generate.
 .PARAMETER MaximumPasswordLength
     The maximum length of the password to generate.
-.NOTES
-    The function will generate an error if the minimum password length doesn't match the sum of minimum lengths of character from each set.
 .PARAMETER Seed
     The seed to use for generating the password.
+.NOTES
+    The function will generate an error if the minimum password length doesn't match the sum of minimum lengths of character from each set.
 .OUTPUTS
     System.String. The generated password.
 .EXAMPLE
@@ -103,9 +113,7 @@ function Get-PseudoRandomPassword {
     # Random password length
     [UInt32]$PasswordLength = Get-Random -Minimum ([int]$MinimumPasswordLength) -Maximum ([int]($MaximumPasswordLength + 1))
     # Generate characters with the given charset
-    [char[]]$Characters = Get-RandomCharacters -Charset $Charset -Length $PasswordLength
-
-    return [string]::new($Characters)
+    return Get-RandomCharacters -Charset $Charset -Length $PasswordLength
 }
 
 <#
@@ -154,7 +162,13 @@ function Get-RandomCharacters {
         $Characters[$CurrentLength] = $Set | Get-Random
     }
 
-    return $Characters
+    # Return randomized order
+    do {
+        $Characters = $Characters | Get-Random -Count $Characters.Count
+        $String = [string]::new($Characters)
+    } while($Charset.hasExcludedWords($String))
+
+    return $String
 }
 
 <#
@@ -183,13 +197,21 @@ function New-RandomSeed {
 }
 
 class PasswordCharset {
-    PasswordCharset([char[][]]$Sets, [UInt32[]]$Lengths, [UInt32[]]$Frequencies) {
+    PasswordCharset(
+        [char[][]]$Sets,
+        [UInt32[]]$Lengths,
+        [UInt32[]]$Frequencies,
+        [string[]]$ExcludedTokens = @(),
+        [bool]$CaseSensitiveExclusion
+    ) {
         if ($Lengths.Count -ne $Sets.Count -or $Frequencies.Count -ne $Sets.Count) {
             throw [System.ArgumentException]::new('Array must have the same count')
         }
 
         $this.Sets = $Sets
         $this.Lengths = $Lengths
+        $this.ExcludedTokens = $ExcludedTokens
+        $this.CaseSensitiveExclusion = $CaseSensitiveExclusion
 
         $this.initRange($Frequencies)
     }
@@ -254,11 +276,32 @@ class PasswordCharset {
         return $this.FinalFrequency
     }
 
+    # Return whether or not the value is excluded
+    [bool]hasExcludedWords([string]$Value) {
+        if ($this.CaseSensitiveExclusion) {
+            foreach($Token in $this.ExcludedTokens) {
+                if ($Value -clike $Token) {
+                    return $true
+                }
+            }
+        } else {
+            foreach($Token in $this.ExcludedTokens) {
+                if ($Value -like $Token) {
+                    return $true
+                }
+            }
+        }
+
+        return $false
+    }
+
     hidden [char[][]]$Sets
     hidden [UInt32[]]$Lengths
     hidden [UInt32[]]$FrequencyRanges
     hidden [UInt32[]]$Frequencies
     hidden [UInt32]$FinalFrequency
+    hidden [string[]]$ExcludedTokens
+    hidden [bool]$CaseSensitiveExclusion
 }
 
 Export-ModuleMember New-PasswordCharset
