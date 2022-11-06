@@ -6,7 +6,7 @@ This PowerShell script can help generating a pseudo-random password, using a see
 
 ### A common problem
 
-Let's say you want to generate AD users from a database. To generate their password, you may want to use a char array, and generate random characters from the char array. With >1000 users, how many passwords would not meet [password complexity](https://learn.microsoft.com/en-us/windows/security/threat-protection/security-policy-settings/password-must-meet-complexity-requirements) requirements? The **New-ADUser** function could fail many times because of that.
+Let's say you want to generate AD users from a database. To generate their password, you may want to use a set of character (char array), and generate characters by grabbing random characters from the char array. With >1000 users, how many passwords would not meet [password complexity](https://learn.microsoft.com/en-us/windows/security/threat-protection/security-policy-settings/password-must-meet-complexity-requirements) requirements? The **New-ADUser** function could fail many times because of that.
 
 The password length could be increased to reduce errors, that still doesn't solve the base problem. But even though you may increase the length up to 16, there will be 2 problems :
 - Users could have difficulties to input their generated password, you could end up with *many users asking you to reset their password*.
